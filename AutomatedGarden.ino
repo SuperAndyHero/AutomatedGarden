@@ -5,6 +5,7 @@
 const String NetworkName = "ATT449";
 const String NetworkPassword = "5916889444";
 const String ServerIP  = "192.168.1.68";
+const String ServerPort  = "1234";
 
 //const String DefaultPacket = "DefaultPacket:0;DefaultPacketData";//is now just a number: 3;2:1
 //const String SamplePacket = "DataTypeTest;DataHere=";
@@ -145,11 +146,15 @@ void loop()
     {  
       timeElapsed = 0;
 
+      //read stuff here
+      //do stuff here
+      //write to packet buffer
+      
       //may need to check connection status
 
       if(WifiConnection && EspOK()){
-        String arr[] = {DefaultPacket, SamplePacket + String(analogRead(A9)), "Special THIRD packet"};//TODO change so these are made as they are sent?
-        SendPackets(arr, sizeof(arr) / sizeof(arr[0]));//sizeof is a compile time function which gets the size in bytes (and strings argie reference types(?) so their size is the same)
+        //String arr[] = {DefaultPacket, SamplePacket + String(analogRead(A9)), "Special THIRD packet"};//TODO change so these are made as they are sent?
+        SendPackets();//sizeof is a compile time function which gets the size in bytes (and strings argie reference types(?) so their size is the same)
       }
     }
   }
@@ -158,46 +163,45 @@ void ReadSensors(){
 
 }
 
-void SendPackets(int packets[][], int packetCount){
-  int a = sizeof(arr) / sizeof(arr[0];
-  if(SerialConnected)
-    Serial.println("starting tcp connection");
+void SendPackets(){
+  if(SerialConnected) Serial.println("starting tcp connection");
 
-  SendCommand("AT+CIPSTART=\"TCP\",\"" + ServerIP + "\",1234\r\n", 4000);//start TCP connection
+  SendCommandLine("AT+CIPSTART=\"TCP\",\"" + ServerIP + "\"," + ServerPort, 4000);//start TCP connection
   delay(1000);
 
-  bool successConnect = false;//if the previous for loop found the connect symbol
-  for (int k = 0; k < packetCount; ++k)//i++ and ++i are the same here (same as i=i+1)
-  {      
-      Serial2.println("AT+CIPSEND=" + String(packets[k].length()));
-      delay(200);
+  //either in the send loop, or before here listen for incoming packets
+
+  Serial2.println("AT+CIPSEND=10");//"00;001:001"
+  delay(200);
+
+  int packetCount = sizeof(PacketBuffer) / sizeof(PacketBuffer[0];
+  if(Serial2.find(">"))
+  {
+    for (int k = 0; k < packetCount; ++k)//i++ and ++i are the same here (same as i=i+1)
+    {      
+      //Serial.println("Response '>' found, sending data:");//debug
       
-      if(successConnect || Serial2.find(">"))//if response for sending packets is found
-      {
-        successConnect = true;
-        //Serial.println("Response '>' found, sending data:");//debug
-        
-        if(SerialConnected)
-          Serial.println(packets[k]);//debug
+      String out = sprintf("%02d", PacketBuffer[k][0]) + ";" + 
+      sprintf("%03d", PacketBuffer[k][1]) + ":" + 
+      sprintf("%03d", PacketBuffer[k][2];
 
-        Serial2.println(packets[k]);
-        delay(50);//datasheet says a 20ms minimum between packets
-        //I ran into issues sending multiple packets in one send, (due to length and other factors), so each is sent on its own
-        //this doesn't account for responses during packets
-        //Serial.println("Ending Packets");//debug
-        Serial2.print("+++");//ends packet sending and returns to normal command mode
-        delay(2000);//datasheet says wait at least one second after returning to normal command mode
-      }
-      else
-      {
-        if(SerialConnected)
-          Serial.println("Response '>' not found, closing connection");//debug
+      if(SerialConnected) Serial.println(out);//debug
 
-        //Serial2.println("AT+CIPCLOSE");
-        break;
-      }
+      Serial2.println(out);
+      delay(50);//datasheet says a 20ms minimum between packets
+    }
+
+    //Serial.println("Ending Packets");//debug
+    Serial2.print("+++");//ends packet sending and returns to normal command mode
+    delay(2000);//datasheet says wait at least one second after returning to normal command mode
+
+    Serial2.println("AT+CIPCLOSE");    
   }
-  Serial2.println("AT+CIPCLOSE");
+  else
+  {
+    if(SerialConnected) Serial.println("Response '>' not found, closing connection");
+    Serial2.println("AT+CIPCLOSE");
+  }
 }
 
 void InitWifiModule()      
